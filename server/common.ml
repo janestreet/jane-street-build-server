@@ -34,7 +34,7 @@ let os = lazy (
 let stat_args = lazy(
   match%map Lazy.force os with
   | Darwin          -> ["-f"; "%Sa"; "-t"; "%F %T %z"]
-  | Linux | Other _ -> ["-format"; "%y"]
+  | Linux | Other _ -> ["--format"; "%y"]
 )
 
 let rotate_old_log_for ~build_dir pkg_name =
