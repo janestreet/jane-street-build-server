@@ -1,0 +1,50 @@
+build-pkg quick tutorial
+========================
+
+Setup
+-----
+
+Run (the name of the directory doesn't matter; it's easier to keep track of multiple opam
+base dirs when they're named after the switches used to set them up)
+
+server/build_pkg_server.exe serve -port 54321 -base-dir /tmp/opam.4.02.3
+
+This will prepare the server for setup in some_dir. To actually set the server up and prepare
+it for incoming requests, run 
+
+client/build_pkg.exe setup -host localhost -port 54321 -opam-switch 4.02.3
+
+Note that in some conditions passing an invalid switch may take a long time before failing.
+
+
+Building
+--------
+
+After the server has been set up, one can build packages using
+
+client/build_pkg.exe build -host localhost -port 54321 -checksum-file /tmp/checksum.md5 ../repos/core_kernel
+
+The checksum file is the file to which the checksum of all the build artifacts will be written to,
+and the anonymous argument is the path to a public-release repo -- the client expects to find there
+two files: .metadata.sexp and dist.tar.gz.
+
+If the build fails, the client will show last n (= 20) lines of the raw output of the commands it ran
+(most importantly - make). The file names and line numbers will be converted so that they correspond
+to files in jane/.
+
+Logs
+----
+
+In <base_dir>/build/log are logs for every build separately (<package_name>.log) and one for all builds
+(all.log).
+
+Old logs are stored in <base_dir>/build/log/old.
+
+
+Limitations
+-----------
+
+
+If you start a server in an opam base dir and run jenga, she(?) will not rerun builds for packages
+which have already been built. This means that the server will return errors, as it won't find
+dependencies for that package.
