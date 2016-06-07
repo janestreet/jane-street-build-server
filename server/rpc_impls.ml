@@ -206,10 +206,7 @@ module External_packages = struct
     Deferred.List.iter deps ~how:`Parallel ~f:install
 end
 
-let aspcud_url name =
-  sprintf
-    "http://heanet.dl.sourceforge.net/project/potassco/aspcud/1.9.1/aspcud-1.9.1-%s.tar.gz"
-    name
+let aspcud_url = "http://cudf-solvers.irill.org/cudf_remote_proxy"
 
 let setup ~base_dir ~opam_switch =
   Log.Global.info
@@ -252,25 +249,11 @@ let setup ~base_dir ~opam_switch =
       in
 
       (* Set up aspcud. *)
-      let aspcud_dir = build_dir in
       let bin_dir = bin_dir ~base_dir in
-      let%bind aspcud_pkg_name =
-        match%map S.run_one "uname" ["-s"] with
-        | "Darwin" -> "macos-10.9"
-        | "Linux" ->  "x86_64-linux"
-        | os -> failwithf "system not supported: %s" os ()
-      in
-      let aspcud_url = aspcud_url aspcud_pkg_name in
+      let aspcud = bin_dir ^/ "aspcud" in
       let%bind () = S.run_zero "mkdir" ["-p"; bin_dir] in
-      let%bind () = S.run_zero "wget" ["-q"; aspcud_url; "-O"; aspcud_dir ^/ "aspcud.tgz"] in
-      let%bind () = S.run_zero ~working_dir:aspcud_dir "tar" ["xf"; "aspcud.tgz"] in
-      let run_aspcud =
-        sprintf "#!/bin/sh\n\
-                 cd %s\n\
-                 exec ./aspcud \"$@\"\n"
-          (aspcud_dir ^/ "aspcud-1.9.1-" ^ aspcud_pkg_name)
-      in
-      let%bind () = Writer.save ~contents:run_aspcud ~perm:0o775 (bin_dir ^/ "aspcud") in
+      let%bind () = S.run_zero "wget" ["-q"; aspcud_url; "-O"; aspcud] in
+      let%bind () = S.run_zero "chmod" ["+x"; aspcud] in
       Unix.putenv ~key:"PATH" ~data:(bin_dir ^ ":" ^ (Unix.getenv_exn "PATH"));
 
       let%bind () = setup_environmental_variables ~opam_root ~opam_switch in
