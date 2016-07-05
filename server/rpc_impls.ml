@@ -208,7 +208,7 @@ end
 
 let aspcud_url = "http://cudf-solvers.irill.org/cudf_remote_proxy"
 
-let setup ~base_dir ~opam_switch =
+let setup ~base_dir ~opam_switch ~use_irill_solver =
   Log.Global.info
     "serving rpc setup (opam switch: %s) (base_dir: %s)"
     (Opam_switch.to_string opam_switch)
@@ -249,12 +249,19 @@ let setup ~base_dir ~opam_switch =
       in
 
       (* Set up aspcud. *)
-      let bin_dir = bin_dir ~base_dir in
-      let aspcud = bin_dir ^/ "aspcud" in
-      let%bind () = S.run_zero "mkdir" ["-p"; bin_dir] in
-      let%bind () = S.run_zero "wget" ["-q"; aspcud_url; "-O"; aspcud] in
-      let%bind () = S.run_zero "chmod" ["+x"; aspcud] in
-      Unix.putenv ~key:"PATH" ~data:(bin_dir ^ ":" ^ (Unix.getenv_exn "PATH"));
+      let%bind () =
+        if not use_irill_solver then
+          return ()
+        else (
+          let bin_dir = bin_dir ~base_dir in
+          let aspcud = bin_dir ^/ "aspcud" in
+          let%bind () = S.run_zero "mkdir" ["-p"; bin_dir] in
+          let%bind () = S.run_zero "wget" ["-q"; aspcud_url; "-O"; aspcud] in
+          let%bind () = S.run_zero "chmod" ["+x"; aspcud] in
+          Unix.putenv ~key:"PATH" ~data:(bin_dir ^ ":" ^ (Unix.getenv_exn "PATH"));
+          return ()
+        )
+      in
 
       let%bind () = setup_environmental_variables ~opam_root ~opam_switch in
       let%map () = run "opam" ["install"; "-y"; "ocamlfind"; "oasis"] in

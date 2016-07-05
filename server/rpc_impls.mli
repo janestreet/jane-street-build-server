@@ -4,6 +4,7 @@ open Build_pkg_common.Std
 val setup
   :  base_dir:string
   -> opam_switch:Opam_switch.t
+  -> use_irill_solver:bool
   (* We can't open Rpcs and just use [Setup.response], because of build system quirks
      (there's a setup.ml in public-release/common-files which causes conflicts. *)
   -> Rpcs.Setup.response Deferred.t

@@ -2,9 +2,9 @@ open Core.Std
 open Async.Std
 open Build_pkg_common.Std
 
-let do_setup ~base_dir _conn_closed (query : Rpcs.Setup.query)
+let do_setup ~base_dir ~use_irill_solver _conn_closed (query : Rpcs.Setup.query)
   : Rpcs.Setup.response Deferred.t =
-  Rpc_impls.setup ~base_dir ~opam_switch:query
+  Rpc_impls.setup ~base_dir ~use_irill_solver ~opam_switch:query
 
 let do_build_v2 ~bin_path conn_closed (query : Rpcs.Build_v2.query)
   : Rpcs.Build_v2.response Deferred.t =
@@ -12,19 +12,19 @@ let do_build_v2 ~bin_path conn_closed (query : Rpcs.Build_v2.query)
     ~metadata:query.metadata ~bin_path ~tarball:query.tarball
     ~connection_closed:conn_closed
 
-let implementations ~base_dir ~bin_path =
+let implementations ~base_dir ~use_irill_solver ~bin_path =
   Rpc.Implementations.create_exn
     ~on_unknown_rpc:(`Call (fun _conn_state ~rpc_tag ~version ->
       Log.Global.error "Unknown rpc (%s, %d)" rpc_tag version;
       `Continue))
     ~implementations:
-      [ Rpc.Rpc.implement Rpcs.Setup.rpc    (do_setup    ~base_dir)
+      [ Rpc.Rpc.implement Rpcs.Setup.rpc (do_setup ~base_dir ~use_irill_solver)
       ; Rpc.Rpc.implement Rpcs.Build_v2.rpc (do_build_v2 ~bin_path)
       ]
 
-let serve port base_dir bin_path () =
+let serve port base_dir bin_path use_irill_solver () =
   let bin_path = Option.value bin_path ~default:Sys.executable_name in
-  let implementations = implementations ~base_dir ~bin_path in
+  let implementations = implementations ~base_dir ~bin_path ~use_irill_solver in
   let%bind _ =
     Rpc.Connection.serve
       ~implementations
@@ -61,11 +61,12 @@ let build config pkg_name tarball_path metadata () =
 let command_serve =
   Command.async' ~summary:"start build_pkg_server"
     (let open Command.Let_syntax in
-     let%map_open port = flag "-port" (required int) ~doc:" server port"
-     and base_dir = flag "-base-dir" (required string) ~doc:" base directory for opam root(s)"
-     and bin_path = flag "-bin-path" (optional string) ~doc:" location of this binary"
+     let%map_open port = flag "-port"  (required int) ~doc:" server port"
+     and base_dir  = flag "-base-dir"  (required string) ~doc:" base directory for opam root(s)"
+     and bin_path  = flag "-bin-path"  (optional string) ~doc:" location of this binary"
+     and use_irill = flag "-use-irill" no_arg ~doc:" use irill solvers instead of local solver"
      in
-     serve port base_dir bin_path)
+     serve port base_dir bin_path use_irill)
 
 let command_build =
   Command.async' ~summary:"build package; do not call directly"
