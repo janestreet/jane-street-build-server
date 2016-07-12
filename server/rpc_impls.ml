@@ -142,7 +142,7 @@ module External_packages = struct
 
   type request =
     { package  : Package_name.t
-    ; finished : unit Ivar.t
+    ; finished : (unit, exn) Result.t Ivar.t
     } [@@deriving fields]
 
   let do_install_now ~run requests =
@@ -150,32 +150,35 @@ module External_packages = struct
     (* Special hack for zarith, see
        https://forge.ocamlcore.org/tracker/index.php?func=detail&aid=1539&group_id=243&atid=1095
     *)
-    let%bind to_install_set =
-      let zarith = Package_name.of_string "zarith" in
-      if not (Set.mem to_install_set zarith) then
-        return to_install_set
-      else
-        let is_32bit =
-          String.is_suffix ~suffix:"32bit"
-            (Set_once.get_exn config |> Config.opam_switch |> Opam_switch.to_string)
+    let%map result =
+      Monitor.try_with (fun () ->
+        let%bind to_install_set =
+          let zarith = Package_name.of_string "zarith" in
+          if not (Set.mem to_install_set zarith) then
+            return to_install_set
+          else
+            let is_32bit =
+              String.is_suffix ~suffix:"32bit"
+                (Set_once.get_exn config |> Config.opam_switch |> Opam_switch.to_string)
+            in
+            if not is_32bit then
+              return to_install_set
+            else
+              let%map () =
+                run "i386" ["env"; "CC=gcc -m32"; "opam"; "install"; "zarith"; "-y"]
+              in
+              Set.remove to_install_set zarith
         in
-        if not is_32bit then
-          return to_install_set
+        (* Make sure we're not running it without packages. *)
+        if Set.is_empty to_install_set then
+          Deferred.unit
         else
-          let%map () =
-            run "i386" ["env"; "CC=gcc -m32"; "opam"; "install"; "zarith"; "-y"]
+          let packages =
+            Set.to_list to_install_set |> List.map ~f:Package_name.to_string
           in
-          Set.remove to_install_set zarith
+          run "opam" (["install"; "-y"] @ packages))
     in
-    (* Make sure we're not running it without packages. *)
-    let%map () =
-      if Set.is_empty to_install_set then
-        Deferred.unit
-      else
-        let packages = Set.to_list to_install_set |> List.map ~f:Package_name.to_string in
-        run "opam" (["install"; "-y"] @ packages)
-    in
-    List.iter requests ~f:(fun r -> Ivar.fill r.finished ())
+    List.iter requests ~f:(fun r -> Ivar.fill r.finished result)
 
   let rec install_loop ~run package_stream =
     match%bind Stream.next package_stream with
@@ -198,8 +201,11 @@ module External_packages = struct
     | Some _ -> Log.Global.info "install loop already running"
 
   let install package =
-    Deferred.create (fun ivar ->
-      Tail.extend tail { package; finished = ivar })
+    let%map result =
+      Deferred.create (fun ivar ->
+        Tail.extend tail { package; finished = ivar })
+    in
+    Result.ok_exn result
 
   let install_deps ~deps =
     let deps = List.filter deps ~f:(fun pkg -> not (Hash_set.mem installed pkg)) in
