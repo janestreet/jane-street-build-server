@@ -174,7 +174,11 @@ module External_packages = struct
           Deferred.unit
         else
           let packages =
-            Set.to_list to_install_set |> List.map ~f:Package_name.to_string
+            Set.to_list to_install_set
+            |> List.map ~f:Package_name.to_string
+            |> List.map ~f:(function
+              | "ctypes" -> "ctypes.0.5.1"
+              | s -> s)
           in
           run "opam" (["install"; "-y"] @ packages))
     in
@@ -381,16 +385,17 @@ let start_build ~base_dir ~pkg_name ~pkg_dependencies ~(metadata : Package_metad
      (by setting their status to an error) *)
   let statuses = List.filter_map to_kill ~f:(fun name ->
     let build_info_def = Hashtbl.find builds name in
-    (match build_info_def with
-     | None ->
-       Log.Global.error !"no status for a killed dependency: %{Package_name}" name
-     | Some _ ->
-       let data =
-         return (Error (ksprintf Error.of_string
-                          !"Build interrupted by %{Package_name}" pkg_name))
-       in
-       Hashtbl.set builds ~key:name ~data);
-    build_info_def)
+    match build_info_def with
+    | None ->
+      Log.Global.error !"no status for a killed dependency: %{Package_name}" name;
+      None
+    | Some info ->
+      let data =
+        return (Error (ksprintf Error.of_string
+                         !"Build interrupted by %{Package_name}" pkg_name))
+      in
+      Hashtbl.set builds ~key:name ~data;
+      Some (name, info))
   in
 
   (* Start installing external deps in the background *)
@@ -423,10 +428,12 @@ let start_build ~base_dir ~pkg_name ~pkg_dependencies ~(metadata : Package_metad
   in
   (* Kill the rest. *)
   let%bind () =
-    Deferred.List.iter ~how:`Parallel statuses ~f:(fun status ->
+    Deferred.List.iter ~how:`Parallel statuses ~f:(fun (name, status) ->
       match%bind status with
       | Error _ -> return ()
       | Ok { Build_info.process; wait; response = _ } ->
+        debug !"%s: killing dependant process for package %{Package_name}..."
+          colorized name;
         kill_process process ~wait;
         let%bind _ = wait in
         return ())
@@ -519,9 +526,14 @@ let delegate_build ~(metadata : Package_metadata.t) ~bin_path ~tarball ~connecti
 
     (* Construct the deferred, but don't bind on it. *)
     let start_build =
-      start_build
-        ~base_dir ~pkg_name ~pkg_dependencies ~metadata ~tarball_path ~tarball ~bin_path
-        ~config ~connection_closed ~colorized
+      match%map
+        Monitor.try_with_or_error (fun () ->
+          start_build
+            ~base_dir ~pkg_name ~pkg_dependencies ~metadata ~tarball_path ~tarball
+            ~bin_path ~config ~connection_closed ~colorized)
+      with
+      | Ok x -> x
+      | Error _ as e -> e
     in
 
     Hashtbl.set builds ~key:pkg_name ~data:start_build;
