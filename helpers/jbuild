@@ -1,0 +1,3 @@
+(library
+ ((name public_release_helpers)
+  (libraries (core async))))

@@ -1,0 +1,7 @@
+(library
+ ((name build_pkg_common)
+  (libraries (
+    async_rpc_kernel
+    core_kernel
+    ))
+  ))

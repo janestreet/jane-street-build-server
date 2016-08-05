@@ -1,0 +1,9 @@
+(executables
+ ((names (build_pkg))
+  (libraries (
+    core_extended
+    public_release_lib
+    build_pkg_common
+    ocaml_re
+    async)))
+ )
