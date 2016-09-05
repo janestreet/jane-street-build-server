@@ -67,7 +67,10 @@ let process_log =
               line_no
             | Some internal_line_no -> internal_line_no
           in
-          sprintf "File \"%s\", line %d%s" new_filename new_line_no line_tail))
+          let reach_root_from__public_release__repos__pkg_dir = "../../.." in
+          sprintf "File \"%s/%s\", line %d%s"
+            reach_root_from__public_release__repos__pkg_dir
+            new_filename new_line_no line_tail))
       |> Deferred.all
     in
     raw_log
