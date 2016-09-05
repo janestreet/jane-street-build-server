@@ -1,0 +1,223 @@
+* Real time CI for opam packages
+
+This document describe a real time CI system. The goal is to be able
+to test a set of packages on a set of different configurations
+simultaneously and get feedback when editing source files as quickly
+as one would get with a local incremental build system.
+
+** Motivation
+
+The motivation for this work is the public release of Jane Street
+packages. Jane Street packages released on github are organized and
+built differently as inside of Jane Street.
+
+Internally we have a rolling release system, and new code is released
+everyday. As a result Jane Street developpers often accidentaly break
+the public builds. Many of them know little about opam and most of
+them know nothing about oasis or ocamlbuild. Maintaining the public
+builds is then left to a handful of public releasers.
+
+The workflow with a classic CI system would be the following:
+
+1. wait for a notification from the CI about a build failure
+2. understand/debug the build failure
+3. fix the code, push
+4. loop to 1.
+
+This is fine if one expects rare build failures but impratical in our
+case as we get frequent build failures that require multiple
+adjustments.
+
+What we need instead is the same workflow as when working on a local
+project with a build system running in polling mode:
+1. edit the code
+2. save
+3. wait a few seconds or less for the result
+4. loop to 1.
+
+We currently have such a workflow for testing the public release with
+a made-up build server. However it has a lot of small pitfalls and
+hacks and maintaining it is painful. It also need frequent manual
+interventions as it get stuck for one reason or another.
+
+** Scope
+
+In this document we describe the usage at Jane Street. However such a
+system would be useful outside of Jane Street as well.
+
+A typical example is when one wants its code to be compatible with
+multiple versions of the compiler. Using such a system would allow the
+developper to build the code all versions of the compiler
+simultaneously.
+
+Another use-case is to develop confortably on a Linux/OSX laptop while
+building on a Windows server.
+
+** Detailed description of the Jane Street public release
+
+At Jane Street we have a big repository called jane containing most of
+the world. It contains all the code that is released on github, but
+not organized with the same layout.
+
+This repository contains descriptions of all our public
+packages. These descriptions are very small, they essentially consist
+of what directories to pick to form a package, the descr file for opam
+as well as whatever hacks are needed to get things to build with
+oasis/ocamlbuild.
+
+We then have a function, defined as a set of jenga rules and ocaml
+tools to produce the publicly released packages. We'll call this
+function =pub=. =pub(jane)= is a set of tarballs, one per github
+repository. To publish our code on github we do the following:
+
+1. compute =pub(jane)=
+2. clone all the github repository
+3. replace working copies of all repository by the contents of the
+   tarballs (i.e. replace everything but the .git directory)
+4. commit the result as it
+5. push to github
+
+Each tarball in =pub(jane)= has an opam file and our development opam
+repository is automatically created from =pub(jane)=.
+
+=pub(jane)= is also the input of the build servers.
+
+** Real Time CI, client side
+
+One the client side, i.e. the workstation where the developper is
+editing the code, we need a tool monitoring =pub(jane)=, distributing
+tarballs as they change to various build slaves and reporting the
+status of the various packages on the various build servers.
+
+The tool have some form of UI that makes it easy to get the last build
+log of a particular package, in order to inspect failures easily. The
+main view should show what's currently happening on the various slaves
+as well as listing the current build failures.
+
+*** Integration with jenga
+
+Currently the build slaves are governed by jenga, this is nice as we
+can point a build error in the opam environment to the original file
+in the jane repo.
+
+To do this we need a command line tool that takes one tarball and the
+name of a slave, wait until the build on this slave has terminated and
+return the result; either a tail of the build log in case of failure
+or a checksum in case of success. This checksum should be a checksum
+of all the artifacts that have been installed by the package.
+
+The jenga rules stores these checksums in files and setup dependencies
+between these files in the same way that packages depend on each
+others.
+
+*** Bandwidth usage
+
+The slaves might not be running on the same maching and it might be
+interesting to not send the whole tarballs everytime. This can be done
+for instance by maintaining a git repo with the contents of the
+tarballs to send only diffs to slaves.
+
+For the Jane Street use case we just don't care as our network is fast
+but for other users it probably matters.
+
+** Real time CI, builder slave side
+
+One slave should control one configuration: one opam root with one
+switch. It seems natural to run slaves in docker containers, but
+docker shouldn't be required as we don't have a docker setup at Jane
+Street.
+
+A slave will take as parameters an opam repository and a compiler
+version. The opam repository should default to the main one.
+
+*** Job of a slave
+
+A slave will basically take a set of tarballs and be continously
+trying to build and install them all. Basically when the server is
+idle the opam root it controls is in the same state as it would be if
+we had pinned all the tarballs and built and installed them.
+
+When a new state of the set of tarballs comes in, the build server
+should do as little work as possible in order to get into the idle
+state described before.
+
+Especially it should:
+
+1. not have to pay the cost of =opam install= if none of the opam
+   files have changed
+
+2. reuse build artifacts from the previous build as much as possible
+
+3. don't invoke the build system when not necessary
+
+Example of (3):
+- we have two packages A and B and B depend on A
+- A changes and B is unchanged
+- A is successfully rebuilt, but it installs exactly the same thing as
+  before, i.e. it install the same set of files and none of them has
+  changed
+- in this case the build system of B shouldn't be invoked at all
+
+This is important for the Jane Street case as we are working with
+nearly 100 packages and we don't want to trigger all the build system
+whenever we do a change in a package near the roots of the DAG that
+doesn't change what is installed.
+
+Currently we do that by taking a checksum of installed files. This
+rely on the the package generating a .install file. We make sure of
+computing the checksum in a way that doesn't take timestamps into
+account, so packing everything into a .tar.gz and taking the checksum
+of the tarball is not acceptable. This checksum is what is reported to
+jenga.
+
+All Jane Street packages are generating .install files so it's fine if
+this is the only supported method.
+
+*** Incremental builds and artifacts
+
+In order to make incremental builds as fast as possible, we must keep
+build artifacts for packages between successive builds. We currently
+have a half-baked solution using ocamlbuild and keeping the _build
+directories. However it is not reliable and hopefully we'll soon move
+away from ocamlbuild. The next build system for our packages, based on
+makefiles generated by jenga will produce artifacts in the same
+directories as source files.
+
+However, it should be possible to get a general solution that work
+regardless of where the artifacts are. A builder can compute the set
+of artifacts created by a build (all files that are present after the
+build and where not present before) and copy them after extracting a
+new version of a tarball.
+
+There are two main problems with this kind of approach:
+
+1. we can end up in a situation where an incremental build succeed
+while a build from scratch would fail because a source file has been
+deleted but the artifacts remains. This situation can happen during
+normal development and not many build systems support this properly
+anyway so we can live with it
+
+2. many build system don't track external dependencies, so if a
+ependency has been reinstalled we might get inconsistent assumptions
+on .cm* files. A good approximation would be look at the imports of
+all the .cm* files and decide which one should be discarded depending
+on the state of external artifacts
+
+On the client side we need an way to request the purge of artifacts
+for a given package - and possibly for all its dependants as well -
+for a given slave or all slaves. If the developper thinks a failure is
+due to dangling artifacts, they can request a purge.
+
+*** Debugging
+
+Sometimes the best way to debug a failure is to get a shell on the
+target environment. When logged on the same system as build slave, we
+should have a way to get a shell in the environment of the opam root
+controlled by the build server and with a copy of the latest builds.
+
+** Time estimate
+
+I estimate than writing such as system is a month of full time
+work. This estimation is based on the time it took to write our
+current server, which was written by an intern.
+
