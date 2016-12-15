@@ -1,9 +1,12 @@
 (executables
  ((names (build_pkg_server))
-  (public_release ((build_and_install ((build_pkg_server jane-street-build-server)))))
   (libraries (
     core
     async
     build_pkg_common
     public_release_helpers)))
  )
+
+(install
+ ((section bin)
+  (files ((build_pkg_server.exe as jane-street-build-server)))))

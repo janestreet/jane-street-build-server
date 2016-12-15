@@ -186,9 +186,6 @@ module External_packages = struct
           let packages =
             Set.to_list to_install_set
             |> List.map ~f:Package_name.to_string
-            |> List.map ~f:(function
-              | "ctypes" -> "ctypes.0.5.1"
-              | s -> s)
           in
           run "opam" (["install"; "-y"] @ packages))
     in

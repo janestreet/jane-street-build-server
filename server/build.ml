@@ -52,7 +52,9 @@ let do_install ~base_dir ~build_dir ~pkg_name ~(run : Logger.run_t) ~prefix ~log
   (* Uninstall currently installed package *)
   let%bind () =
     match%bind is_file install_file with
-    | true -> run "opam-installer" ["-u"; "--prefix"; prefix; install_file]
+    | true ->
+      let%bind () = run "opam-installer" ["-u"; "--prefix"; prefix; install_file] in
+      run "rm" ["-f"; install_file]
     | false -> Deferred.unit
   in
   let%bind () =

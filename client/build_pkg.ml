@@ -19,22 +19,22 @@ let process_log =
     (* Line mapping between [public_file] and its internal equivalent. *)
     let line_mapping public_file =
       match%map
-          let public_file =
-            if String.is_prefix public_file ~prefix:"./"
-            then String.drop_prefix public_file 2
-            else public_file
+        let public_file =
+          if String.is_prefix public_file ~prefix:"./"
+          then String.drop_prefix public_file 2
+          else public_file
+        in
+        match Map.find file_mapping public_file with
+        | None -> Deferred.Or_error.errorf "Mapping not found for %s" public_file
+        | Some internal_file ->
+          Monitor.try_with_or_error (fun () ->
+            S.run_lines "tar" ["-Oxf"; tarball_path; pkg_name ^/ public_file])
+          >>=? fun public_lines ->
+          let%map internal_lines =
+            let%bind root = get_root () in
+            Reader.file_lines (root ^/ internal_file)
           in
-          match Map.find file_mapping public_file with
-          | None -> Deferred.Or_error.errorf "Mapping not found for %s" public_file
-          | Some internal_file ->
-            Monitor.try_with_or_error (fun () ->
-              S.run_lines "tar" ["-Oxf"; tarball_path; pkg_name ^/ public_file])
-            >>=? fun public_lines ->
-            let%map internal_lines =
-              let%bind root = get_root () in
-              Reader.file_lines (root ^/ internal_file)
-            in
-            Ok (Grep.line_mapping' ~public_lines ~internal_lines)
+          Ok (Grep.line_mapping' ~public_lines ~internal_lines)
       with
       | Ok map -> map
       | Error err ->
@@ -54,6 +54,16 @@ let process_log =
           let line_no = matches.(2) |> Int.of_string in
           let line_tail = matches.(3) in
           let new_filename =
+            let filename =
+              let pp_ml = ".pp.ml" in
+              let pp_mli = ".pp.mli" in
+              if String.is_suffix filename ~suffix:pp_ml then
+                Filename.chop_suffix filename pp_ml ^ ".ml"
+              else if String.is_suffix filename ~suffix:pp_mli then
+                Filename.chop_suffix filename pp_mli ^ ".mli"
+              else
+                filename
+            in
             match Map.find file_mapping filename with
             | None -> Log.Global.error "%s not found in file mapping" filename; line
             | Some orig_filename -> orig_filename
@@ -89,29 +99,31 @@ let print_raw_log raw_log =
     List.iter raw_log ~f:(Core.Std.eprintf "%s\n")
   end
 
-let server_side_metadata_of_client_side_metatada (metadata : Package.t)
+let server_side_metadata_of_client_side_metatada
+      (metadata : Package.t) (deps : Package_dep.t list)
   : Package_metadata.t =
+  let internal_dependencies, external_dependencies =
+    List.partition_map deps ~f:(function
+      | Internal opam_package -> `Fst (Package_name.of_string opam_package)
+      | External opam_package -> `Snd (Package_name.of_string opam_package))
+  in
   { name = metadata.name
-  ; internal_dependencies =
-      List.filter_map metadata.dependencies ~f:(fun dep ->
-        Option.some_if dep.internal dep.opam_package
-        |> Option.map ~f:Package_name.of_string)
-  ; external_dependencies =
-      List.filter_map metadata.dependencies ~f:(fun dep ->
-        Option.some_if (not dep.internal) dep.opam_package
-        |> Option.map ~f:Package_name.of_string)
+  ; internal_dependencies
+  ; external_dependencies
   }
 
 let build_v2 host port checksum_file tarball_dir () =
   let tarball_path  = tarball_dir ^/ "dist.tar.gz" in
-  let metadata_path = tarball_dir ^/ ".metadata.sexp" in
+  let metadata_path = tarball_dir ^/ "metadata.sexp" in
+  let deps_path = tarball_dir ^/ "package-deps.sexp" in
   let%bind metadata = Reader.load_sexp_exn metadata_path Package.t_of_sexp in
+  let%bind deps = Reader.load_sexp_exn deps_path [%of_sexp: Package_dep.t list] in
   let%bind file_list = Reader.file_lines metadata.file_list_filename in
   let%bind tarball_contents = Reader.file_contents tarball_path in
   let query =
     { Rpcs.Build_v2.
       tarball  = tarball_contents
-    ; metadata = server_side_metadata_of_client_side_metatada metadata
+    ; metadata = server_side_metadata_of_client_side_metatada metadata deps
     }
   in
   dispatch ~host ~port Rpcs.Build_v2.rpc query
