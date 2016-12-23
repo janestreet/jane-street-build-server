@@ -5,7 +5,7 @@ open Build_pkg_common.Std
 module S = Public_release_helpers.Std.Shell_helpers
 
 let write_with_timestamp writer line =
-  let time_str = Time.to_string_abs ~zone:Time.Zone.local (Time.now ()) in
+  let time_str = Time.to_string_abs ~zone:(force Time.Zone.local) (Time.now ()) in
   Writer.write writer (time_str ^ " " ^ line ^ "\n")
 
 let log_filename ~build_dir = Common.log_dir ~build_dir ^/ "all.log"
