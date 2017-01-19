@@ -179,14 +179,19 @@ module External_packages = struct
             in
             Set.remove to_install_set js_of_ocaml
         in
+        let packages =
+          Set.to_list to_install_set
+          |> List.map ~f:Package_name.to_string
+          |> List.map
+               ~f:(function
+                 (* We don't have gmp 5 yet *)
+                 | "cryptokit" -> "cryptokit.1.10"
+                 | s -> s)
+        in
         (* Make sure we're not running it without packages. *)
-        if Set.is_empty to_install_set then
+        if List.is_empty packages then
           Deferred.unit
         else
-          let packages =
-            Set.to_list to_install_set
-            |> List.map ~f:Package_name.to_string
-          in
           run "opam" (["install"; "-y"] @ packages))
     in
     List.iter requests ~f:(fun r -> Ivar.fill r.finished result)

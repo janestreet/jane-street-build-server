@@ -22,7 +22,7 @@ let implementations ~base_dir ~use_irill_solver ~bin_path =
       ; Rpc.Rpc.implement Rpcs.Build_v2.rpc (do_build_v2 ~bin_path)
       ]
 
-let serve port base_dir bin_path use_irill_solver () =
+let serve ?switch port base_dir bin_path use_irill_solver () =
   let bin_path = Option.value bin_path ~default:Sys.executable_name in
   let implementations = implementations ~base_dir ~bin_path ~use_irill_solver in
   let%bind _ =
@@ -33,6 +33,20 @@ let serve port base_dir bin_path use_irill_solver () =
       ()
   in
   Log.Global.info "Serving on port %d" port;
+  let%bind () =
+    match switch with
+    | None -> return ()
+    | Some opam_switch ->
+      match%bind do_setup ~base_dir ~use_irill_solver () opam_switch with
+      | Ok () -> return ()
+      | Error (error, raw_log) ->
+        if not (List.is_empty raw_log) then begin
+          Core.Std.eprintf "raw log tail:\n";
+          List.iter raw_log ~f:(Core.Std.eprintf "%s\n")
+        end;
+        Core.Std.eprintf !"Setup error: %{Error#hum}\n%!" error;
+        return ()
+  in
   Deferred.never ()
 
 (* This is in the same binary so as to make deployment easier.
@@ -65,8 +79,10 @@ let command_serve =
      and base_dir  = flag "-base-dir"  (required string) ~doc:" base directory for opam root(s)"
      and bin_path  = flag "-bin-path"  (optional string) ~doc:" location of this binary"
      and use_irill = flag "-use-irill" no_arg ~doc:" use irill solvers instead of local solver"
+     and switch    = flag "-switch"    (optional string)
+                       ~doc:"OPAM-SWITCH setup the server immediately using this opam switch"
      in
-     serve port base_dir bin_path use_irill)
+     serve ?switch:(Option.map switch ~f:Opam_switch.of_string) port base_dir bin_path use_irill)
 
 let command_build =
   Command.async' ~summary:"build package; do not call directly"
