@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 open Build_pkg_common.Std
 open Common

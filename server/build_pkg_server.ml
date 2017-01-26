@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 open Build_pkg_common.Std
 
@@ -41,10 +41,10 @@ let serve ?switch port base_dir bin_path use_irill_solver () =
       | Ok () -> return ()
       | Error (error, raw_log) ->
         if not (List.is_empty raw_log) then begin
-          Core.Std.eprintf "raw log tail:\n";
-          List.iter raw_log ~f:(Core.Std.eprintf "%s\n")
+          Core.eprintf "raw log tail:\n";
+          List.iter raw_log ~f:(Core.eprintf "%s\n")
         end;
-        Core.Std.eprintf !"Setup error: %{Error#hum}\n%!" error;
+        Core.eprintf !"Setup error: %{Error#hum}\n%!" error;
         return ()
   in
   Deferred.never ()

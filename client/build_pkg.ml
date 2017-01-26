@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Async.Std
 open Ocaml_re
 open Public_release_lib.Package_types
@@ -95,8 +95,8 @@ let dispatch ~host ~port rpc query =
 let print_raw_log raw_log =
   if not (List.is_empty raw_log)
   then begin
-    Core.Std.eprintf "raw log tail:\n";
-    List.iter raw_log ~f:(Core.Std.eprintf "%s\n")
+    Core.eprintf "raw log tail:\n";
+    List.iter raw_log ~f:(Core.eprintf "%s\n")
   end
 
 let server_side_metadata_of_client_side_metatada

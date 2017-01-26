@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Build_pkg_common.Std
 
 type t =
