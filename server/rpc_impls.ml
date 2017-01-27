@@ -262,14 +262,25 @@ let setup ~base_dir ~opam_switch ~use_irill_solver =
             >>| Opam_switch.of_string)
           | Some config -> return (Ok (Config.opam_switch config))
         in
+        let set_terminal_window_name () =
+          let u = Core.Unix.uname () in
+          Core.printf "\027]0;%s.%s %s\007%!"
+            (Core.Unix.Utsname.sysname u)
+            (Core.Unix.Utsname.machine u)
+            switch_str
+        in
         match%bind current_switch with
         | Ok current_switch ->
           if current_switch <> opam_switch then
             failwithf !"server already configured with opam switch %{Opam_switch}"
               current_switch ()
-          else
+          else begin
+            set_terminal_window_name ();
             Deferred.unit
-        | Error _ -> run "opam" ["init"; "--no-setup"; "--compiler"; switch_str]
+          end
+        | Error _ ->
+          set_terminal_window_name ();
+          run "opam" ["init"; "--no-setup"; "--compiler"; switch_str]
       in
 
       (* Set up aspcud. *)
