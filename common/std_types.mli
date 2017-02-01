@@ -1,4 +1,4 @@
-open Core_kernel.Std
+open Core_kernel
 
 module Package_checksum : Identifiable.S
 module Package_name     : Identifiable.S
