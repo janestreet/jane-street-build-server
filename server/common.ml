@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 open Build_pkg_common.Std
 
 module S = Public_release_helpers.Std.Shell_helpers

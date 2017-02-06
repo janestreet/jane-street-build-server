@@ -1,4 +1,4 @@
-open Async.Std
+open Async
 open Build_pkg_common.Std
 
 val install_dir : base_dir:string -> string

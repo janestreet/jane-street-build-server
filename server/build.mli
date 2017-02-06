@@ -1,4 +1,4 @@
-open Async.Std
+open Async
 open Build_pkg_common.Std
 
 (** The actual build, invoked in the sub-process *)

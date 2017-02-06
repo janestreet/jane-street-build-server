@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 open Build_pkg_common.Std
 
 let do_setup ~base_dir ~use_irill_solver _conn_closed (query : Rpcs.Setup.query)

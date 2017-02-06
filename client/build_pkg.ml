@@ -1,5 +1,5 @@
 open Core
-open Async.Std
+open Async
 open Ocaml_re
 open Public_release_lib.Package_types
 open Public_release_lib.Import
