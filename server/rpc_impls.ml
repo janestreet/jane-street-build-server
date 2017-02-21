@@ -134,8 +134,6 @@ let dependents : Package_name.Set.t Package_name.Table.t = Package_name.Table.cr
    of the dependencies of each package. *)
 let dependencies : Package_name.Set.t Package_name.Table.t = Package_name.Table.create ()
 
-let js_of_ocaml = Package_name.of_string "js_of_ocaml"
-
 module External_packages = struct
   (* Installed external dependencies are stored in a set, as trying to install already
      installed packages takes too much time (~0.5 s). *)
@@ -169,15 +167,6 @@ module External_packages = struct
                 run "i386" ["env"; "CC=gcc -m32"; "opam"; "install"; "zarith"; "-y"]
               in
               Set.remove to_install_set zarith
-        in
-        let%bind to_install_set =
-          if not (Set.mem to_install_set js_of_ocaml) then
-            return to_install_set
-          else
-            let%map () =
-              run "opam" ["reinstall"; "-y"; "js_of_ocaml"]
-            in
-            Set.remove to_install_set js_of_ocaml
         in
         let packages =
           Set.to_list to_install_set
@@ -226,8 +215,6 @@ module External_packages = struct
   let install_deps ~deps =
     let deps = List.filter deps ~f:(fun pkg -> not (Hash_set.mem installed pkg)) in
     Deferred.List.iter deps ~how:`Parallel ~f:install
-
-  let forget pkg = Hash_set.remove installed pkg
 end
 
 let aspcud_url = "http://cudf-solvers.irill.org/cudf_remote_proxy"
@@ -344,9 +331,7 @@ let process_build_result ~pkg_name proc wait =
   | Ok result ->
     begin
       match result with
-      | Ok _ ->
-        if pkg_name = js_of_ocaml then External_packages.forget js_of_ocaml;
-        Log.Global.info "build %s completed successfully" (colorize pkg_name);
+      | Ok _ -> Log.Global.info "build %s completed successfully" (colorize pkg_name);
       | Error (err, _) ->
         Log.Global.info !"build %s ended with a subcommand error: %{Error#hum}" (colorize pkg_name) err;
     end;
