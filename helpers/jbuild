@@ -1,3 +1,5 @@
 (library
  ((name public_release_helpers)
   (libraries (core async))))
+
+(jbuild_version jane_street)

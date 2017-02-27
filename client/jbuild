@@ -7,3 +7,5 @@
     ocaml_re
     async)))
  )
+
+(jbuild_version jane_street)

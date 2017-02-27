@@ -5,3 +5,5 @@
     core_kernel
     ))
   ))
+
+(jbuild_version jane_street)
