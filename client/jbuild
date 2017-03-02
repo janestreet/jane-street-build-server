@@ -5,7 +5,8 @@
     public_release_lib
     build_pkg_common
     ocaml_re
-    async)))
+    async))
+  (preprocess (pps (ppx_jane))))
  )
 
 (jbuild_version jane_street)

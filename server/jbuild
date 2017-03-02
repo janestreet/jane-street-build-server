@@ -4,7 +4,8 @@
     core
     async
     build_pkg_common
-    public_release_helpers)))
+    public_release_helpers))
+  (preprocess (pps (ppx_jane))))
  )
 
 (install

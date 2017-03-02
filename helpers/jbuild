@@ -1,5 +1,6 @@
 (library
  ((name public_release_helpers)
-  (libraries (core async))))
+  (libraries (core async))
+  (preprocess (pps (ppx_jane)))))
 
 (jbuild_version jane_street)
