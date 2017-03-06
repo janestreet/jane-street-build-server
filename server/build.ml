@@ -37,8 +37,6 @@ let extract_tarball ~pkg_name ~tarball_path ~build_dir =
     | `Yes ->
       S.run_zero ~working_dir:build_dir "find"
         [pkg_name; "-mindepth"; "1";
-         "-not"; "-regex"; pkg_name ^ "/_build/.*"; "-a";
-         "-not"; "-regex"; pkg_name ^ "/_build$";
          "-delete"]
     | `No | `Unknown -> Deferred.unit
   in
