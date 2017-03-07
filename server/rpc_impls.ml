@@ -331,7 +331,8 @@ let process_build_result ~pkg_name proc wait =
   | Ok result ->
     begin
       match result with
-      | Ok _ -> Log.Global.info "build %s completed successfully" (colorize pkg_name);
+      | Ok _ ->
+        Log.Global.info "build %s completed successfully" (colorize pkg_name);
       | Error (err, _) ->
         Log.Global.info !"build %s ended with a subcommand error: %{Error#hum}" (colorize pkg_name) err;
     end;
