@@ -1,5 +1,5 @@
 open Core_kernel
-open Async_rpc_kernel.Std
+open Async_rpc_kernel
 open Std_types
 
 module type S = sig

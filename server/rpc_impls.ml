@@ -190,8 +190,13 @@ module External_packages = struct
     | Nil -> assert false
     | Cons (request, rest) ->
       let%bind () = after (sec 1.) in
-      let requests, rest = Stream.available_now rest in
-      let%bind () = do_install_now ~run (request :: requests) in
+      (* Merging requests doesn't work well when some packages are not installable:
+         {[
+           let requests, rest = Stream.available_now rest in
+           let%bind () = do_install_now ~run (request :: requests) in
+         ]}
+      *)
+      let%bind () = do_install_now ~run [request] in
       install_loop ~run rest
 
   (* Stream of requests *)
