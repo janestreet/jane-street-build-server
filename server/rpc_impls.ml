@@ -158,7 +158,9 @@ module External_packages = struct
           else
             let is_32bit =
               String.is_suffix ~suffix:"32bit"
-                (Set_once.get_exn config |> Config.opam_switch |> Opam_switch.to_string)
+                (Set_once.get_exn config [%here]
+                 |> Config.opam_switch
+                 |> Opam_switch.to_string)
             in
             if not is_32bit then
               return to_install_set
@@ -207,7 +209,8 @@ module External_packages = struct
 
   let start_install_loop ~run =
     match Set_once.get install_loop_guard with
-    | None -> Set_once.set_exn install_loop_guard (install_loop ~run (Tail.collect tail))
+    | None -> Set_once.set_exn install_loop_guard [%here]
+                (install_loop ~run (Tail.collect tail))
     | Some _ -> Log.Global.info "install loop already running"
 
   let install package =
@@ -292,7 +295,7 @@ let setup ~base_dir ~opam_switch ~use_irill_solver =
 
       let%bind () = setup_environmental_variables ~opam_root ~opam_switch in
       let%map () = run "opam" ["install"; "-y"; "ocamlfind"; "oasis"] in
-      Set_once.set_exn config (Config.create ~base_dir ~opam_switch);
+      Set_once.set_exn config [%here] (Config.create ~base_dir ~opam_switch);
       External_packages.start_install_loop ~run)
   in
   match%map setup_status with
