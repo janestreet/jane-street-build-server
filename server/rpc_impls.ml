@@ -151,6 +151,16 @@ module External_packages = struct
     *)
     let%map result =
       Monitor.try_with (fun () ->
+        let to_install_set =
+          (* We don't want to keep "opam install -y" on the following packages which are a
+             dependency of almost every package.
+             So we install them only once when setting up the server. *)
+          List.fold ["jbuilder"; "ocaml-migrate-parsetree" ]~init:to_install_set ~f:(
+            fun set pkg_name ->
+              let pkg = Package_name.of_string pkg_name in
+              if Set.mem set pkg then Set.remove set pkg else set
+          )
+        in
         let%bind to_install_set =
           let zarith = Package_name.of_string "zarith" in
           if not (Set.mem to_install_set zarith) then
@@ -270,6 +280,10 @@ let setup ~base_dir ~opam_switch ~use_irill_solver =
             failwithf !"server already configured with opam switch %{Opam_switch}"
               current_switch ()
           else begin
+            printf "opam install -y jbuilder ocaml-migrate-parsetree\n%!";
+            let%bind () =
+              S.run_ignore "opam" ["install"; "-y"; "jbuilder";"ocaml-migrate-parsetree"]
+            in
             set_terminal_window_name ();
             Deferred.unit
           end
