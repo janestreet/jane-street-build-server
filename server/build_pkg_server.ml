@@ -73,7 +73,7 @@ let build config pkg_name tarball_path metadata () =
     result
 
 let command_serve =
-  Command.async' ~summary:"start build_pkg_server"
+  Command.async ~summary:"start build_pkg_server"
     (let open Command.Let_syntax in
      let%map_open port = flag "-port"  (required int) ~doc:" server port"
      and base_dir  = flag "-base-dir"  (required string) ~doc:" base directory for opam root(s)"
@@ -85,7 +85,7 @@ let command_serve =
      serve ?switch:(Option.map switch ~f:Opam_switch.of_string) port base_dir bin_path use_irill)
 
 let command_build =
-  Command.async' ~summary:"build package; do not call directly"
+  Command.async ~summary:"build package; do not call directly"
     (let open Command.Let_syntax in
      let%map_open config = flag "config" (required string) ~doc:" base_dir: sexp of Config.t"
      and pkg_name = flag "pkg-name" (required string) ~doc:" pkg_name: string"

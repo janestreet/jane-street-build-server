@@ -168,7 +168,7 @@ let rpc_version =
     ]
 
 let command_build =
-  Command.async_or_error' ~summary:"compile packages on remote servers"
+  Command.async_or_error ~summary:"compile packages on remote servers"
     (let open Command.Let_syntax in
      let%map_open host, port = host_port_flags ()
      and checksum_file =
@@ -183,7 +183,7 @@ let command_build =
 
 
 let command_setup =
-  Command.async_or_error' ~summary:"setup the server to use the given switch"
+  Command.async_or_error ~summary:"setup the server to use the given switch"
     (let open Command.Let_syntax in
      let%map_open host, port = host_port_flags ()
      and opam_switch =
