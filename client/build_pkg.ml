@@ -87,7 +87,7 @@ let process_log =
 
 
 let dispatch ~host ~port rpc query =
-  match%bind Rpc.Connection.client ~host ~port () with
+  match%bind Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port {host; port}) with
   | Error exn -> return (Or_error.of_exn exn)
   | Ok connection ->
     Rpc.Rpc.dispatch rpc connection query

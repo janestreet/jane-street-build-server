@@ -29,7 +29,7 @@ let serve ?switch port base_dir bin_path use_irill_solver () =
     Rpc.Connection.serve
       ~implementations
       ~initial_connection_state:(fun _ conn -> Rpc.Connection.close_finished conn)
-      ~where_to_listen:(Tcp.on_port port)
+      ~where_to_listen:(Tcp.Where_to_listen.of_port port)
       ()
   in
   Log.Global.info "Serving on port %d" port;
