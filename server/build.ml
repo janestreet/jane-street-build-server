@@ -42,6 +42,56 @@ let extract_tarball ~pkg_name ~tarball_path ~build_dir =
   in
   S.run_zero "tar" ["xf"; tarball_path; "-C"; build_dir]
 
+let add_line ~opam_file:file pkg_name new_line =
+  let lines = In_channel.with_file file ~f:In_channel.input_lines in
+  let new_lines =
+    let rec insert_sorted = function
+      | [] -> [ new_line ]
+      | line :: lines as lst->
+        let pkg, _ = String.lsplit2_exn line ~on:' ' in
+        if pkg_name < pkg then
+          new_line :: lst
+        else
+          line :: insert_sorted lines
+    in
+    insert_sorted lines
+  in
+  Writer.with_file_atomic file ~f:(fun writer ->
+    List.iter new_lines ~f:(Writer.write_line writer);
+    Writer.flushed writer
+  )
+
+let opam_fake_pin ~opam_root ~working_dir ~prefix run pkg_name =
+  let pkg_name = Package_name.to_string pkg_name in
+  let%bind version =
+    let default = opam_root ^/ "repo/default/packages" ^/ pkg_name in
+    match%bind Sys.file_exists default with
+    | `Yes ->
+      let%bind versions = Sys.ls_dir default in
+      let versions = List.sort ~cmp:(fun x y -> String.compare y x) versions in
+      let _, version = String.lsplit2_exn (List.hd_exn versions) ~on:'.' in
+      return version
+    | _ ->
+      (* if the package doesn't exist in the main repo, then nothing depends on it
+         and it doesn't actually matter if we give a proper vnum or not. *)
+      return "fake"
+  in
+  let dev_pkgs = prefix ^/ "packages.dev" in
+  let%bind () = Unix.mkdir ~p:() dev_pkgs in
+  let%map () = run "cp" ["-r"; working_dir; dev_pkgs ^/ pkg_name ]
+  and () =
+    add_line ~opam_file:(prefix ^/ "pinned") pkg_name
+      (sprintf "%s path %s" pkg_name working_dir)
+  in
+  version
+
+let update_opam_installed_list prefix pkg_name version =
+  let pkg_name = Package_name.to_string pkg_name in
+  let line = sprintf "%s %s" pkg_name version in
+  let%bind () = add_line ~opam_file:(prefix ^/ "installed") pkg_name line
+  and () = add_line ~opam_file:(prefix ^/ "installed.roots") pkg_name line in
+  return ()
+
 let do_install ~base_dir ~build_dir ~pkg_name ~(run : Logger.run_t) ~prefix ~log () =
   let install_file = install_file_for ~base_dir pkg_name in
   let working_dir = Common.build_dir ~base_dir ^/ Package_name.to_string pkg_name in
@@ -65,10 +115,39 @@ let do_install ~base_dir ~build_dir ~pkg_name ~(run : Logger.run_t) ~prefix ~log
     | `No | `Unknown ->
       Deferred.unit
   in
-
+  let%bind () =
+    (* Tell opam to forget about that package, it's gone. *)
+    run "sh" ["-c"; sprintf "grep -v \"^%s \" %s/installed > .installed; \
+                             mv .installed %s/installed"
+                      (Package_name.to_string pkg_name) prefix prefix ]
+  in
+  let%bind () =
+    (* Tell opam to forget about that package, it's gone. *)
+    run "sh" ["-c"; sprintf "grep -v \"^%s \" %s/installed.roots > .installed; \
+                             mv .installed %s/installed.roots"
+                      (Package_name.to_string pkg_name) prefix prefix ]
+  in
+  let%bind () =
+    (* Tell opam to forget about that package, it's gone. *)
+    run "sh" ["-c"; sprintf "grep -v \"^%s \" %s/pinned > .pinned; \
+                             mv .pinned %s/pinned"
+                      (Package_name.to_string pkg_name) prefix prefix ]
+  in
   (* Compile and install *)
+  let%bind opam_version =
+    opam_fake_pin ~opam_root:(opam_root ~base_dir) ~working_dir ~prefix run pkg_name
+  in
   let%bind () = run "make" [] in
   let%bind () = run "make" ["install"; "PREFIX=" ^ prefix] in
+  (* Pretend to opam that we've installed (also, remove opam state cache) *)
+  let%bind () = update_opam_installed_list prefix pkg_name opam_version in
+  let%bind () =
+    let opam_root = opam_root ~base_dir in
+    let cache = opam_root ^/ "state.cache" in
+    match%bind Sys.file_exists cache with
+    | `Yes -> Sys.remove cache
+    | _ -> return ()
+  in
   (* Compute the checksum *)
   let%bind () = run "rm" ["-rf"; "_install"] in
   let%bind () = run "mkdir" ["_install"] in

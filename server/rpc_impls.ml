@@ -155,7 +155,7 @@ module External_packages = struct
           (* We don't want to keep "opam install -y" on the following packages which are a
              dependency of almost every package.
              So we install them only once when setting up the server. *)
-          List.fold ["jbuilder"; "ocaml-migrate-parsetree" ]~init:to_install_set ~f:(
+          List.fold ["jbuilder"; "ocaml-migrate-parsetree" ] ~init:to_install_set ~f:(
             fun set pkg_name ->
               let pkg = Package_name.of_string pkg_name in
               if Set.mem set pkg then Set.remove set pkg else set
@@ -183,11 +183,6 @@ module External_packages = struct
         let packages =
           Set.to_list to_install_set
           |> List.map ~f:Package_name.to_string
-          |> List.map
-               ~f:(function
-                 (* We don't have gmp 5 yet *)
-                 | "cryptokit" -> "cryptokit.1.10"
-                 | s -> s)
         in
         (* Make sure we're not running it without packages. *)
         if List.is_empty packages then
