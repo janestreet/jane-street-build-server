@@ -68,9 +68,31 @@ let opam_fake_pin ~opam_root ~working_dir ~prefix run pkg_name =
     match%bind Sys.file_exists default with
     | `Yes ->
       let%bind versions = Sys.ls_dir default in
+      begin match
+        List.fold_left versions ~init:None ~f:(fun acc dir ->
+          let _pkg, vstring' = String.lsplit2_exn dir ~on:'.' in
+          match String.lsplit2_exn vstring' ~on:'v' with
+          | exception _ -> acc
+          | _, str_vers ->
+            let version' = List.map ~f:Int.of_string (String.split str_vers ~on:'.') in
+            assert (List.length version' = 3);
+            match acc with
+            | Some (_, version) when List.compare Int.compare version version' >= 0 ->
+              acc
+            | _ ->
+              Some (vstring', version')
+        )
+      with
+      | None -> failwith "no vX.YY version?!"
+      | Some (version, _) ->
+        return version
+      end
+      (*
+          List.filter_map versions ~f:(fun )
       let versions = List.sort ~cmp:(fun x y -> String.compare y x) versions in
       let _, version = String.lsplit2_exn (List.hd_exn versions) ~on:'.' in
       return version
+         *)
     | _ ->
       (* if the package doesn't exist in the main repo, then nothing depends on it
          and it doesn't actually matter if we give a proper vnum or not. *)
