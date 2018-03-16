@@ -83,13 +83,14 @@ let opam_fake_pin ~opam_root ~working_dir ~prefix run pkg_name =
               Some (vstring', version')
         )
       with
-      | None -> failwith "no vX.YY version?!"
+      | None -> (* no vX.YY version?! *) return "fake"
       | Some (version, _) ->
         return version
       end
       (*
           List.filter_map versions ~f:(fun )
       let versions = List.sort ~cmp:(fun x y -> String.compare y x) versions in
+      let versions = List.sort ~compare:(fun x y -> String.compare y x) versions in
       let _, version = String.lsplit2_exn (List.hd_exn versions) ~on:'.' in
       return version
          *)

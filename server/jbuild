@@ -5,7 +5,7 @@
     async
     build_pkg_common
     public_release_helpers))
-  (preprocess (pps (ppx_jane ppx_driver.runner))))
+  (preprocess (pps (ppx_jane ppxlib.runner))))
  )
 
 (install

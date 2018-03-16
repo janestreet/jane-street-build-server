@@ -6,7 +6,7 @@
     build_pkg_common
     ocaml_re
     async))
-  (preprocess (pps (ppx_jane ppx_driver.runner))))
+  (preprocess (pps (ppx_jane ppxlib.runner))))
  )
 
 
