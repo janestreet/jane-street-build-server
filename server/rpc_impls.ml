@@ -134,6 +134,7 @@ let dependents : Package_name.Set.t Package_name.Table.t = Package_name.Table.cr
    of the dependencies of each package. *)
 let dependencies : Package_name.Set.t Package_name.Table.t = Package_name.Table.create ()
 
+
 module External_packages = struct
   (* Installed external dependencies are stored in a set, as trying to install already
      installed packages takes too much time (~0.5 s). *)
@@ -144,67 +145,45 @@ module External_packages = struct
     ; finished : (unit, exn) Result.t Ivar.t
     } [@@deriving fields]
 
-  let do_install_now ~run requests =
+  let do_install_now ~is_32bit ~run requests =
     let to_install_set = Package_name.Set.of_list (List.map requests ~f:package) in
-    (* Special hack for zarith, see
-       https://forge.ocamlcore.org/tracker/index.php?func=detail&aid=1539&group_id=243&atid=1095
-    *)
     let%map result =
       Monitor.try_with (fun () ->
-        let to_install_set =
-          (* We don't want to keep "opam install -y" on the following packages which are a
-             dependency of almost every package.
-             So we install them only once when setting up the server. *)
-          List.fold ["jbuilder"; "ocaml-migrate-parsetree" ] ~init:to_install_set ~f:(
-            fun set pkg_name ->
-              let pkg = Package_name.of_string pkg_name in
-              if Set.mem set pkg then Set.remove set pkg else set
-          )
-        in
-        let%bind to_install_set =
-          let zarith = Package_name.of_string "zarith" in
-          if not (Set.mem to_install_set zarith) then
-            return to_install_set
+        let run prog args =
+          (* Special hack for zarith, see
+             https://forge.ocamlcore.org/tracker/index.php?func=detail&aid=1539&group_id=243&atid=1095
+          *)
+          if is_32bit then
+            run "i386" ("env" :: "CC=gcc -m32" :: prog :: args)
           else
-            let is_32bit =
-              String.is_suffix ~suffix:"32bit"
-                (Set_once.get_exn config [%here]
-                 |> Config.opam_switch
-                 |> Opam_switch.to_string)
-            in
-            if not is_32bit then
-              return to_install_set
-            else
-              let%map () =
-                run "i386" ["env"; "CC=gcc -m32"; "opam"; "install"; "zarith"; "-y"]
-              in
-              Set.remove to_install_set zarith
+            run prog args
         in
-        let packages =
-          Set.to_list to_install_set
-          |> List.map ~f:Package_name.to_string
-        in
-        (* Make sure we're not running it without packages. *)
-        if List.is_empty packages then
-          Deferred.unit
-        else
-          run "opam" (["install"; "-y"] @ packages))
+        match List.map (Set.to_list to_install_set) ~f:Package_name.to_string with
+        | [] -> (* Make sure we're not running it without packages. *)
+          return Package_name.Set.empty
+        | packages ->
+          let%map () = run "opam" (["install"; "-y"] @ packages) in
+          to_install_set
+      )
     in
-    List.iter requests ~f:(fun r -> Ivar.fill r.finished result)
+    List.iter requests ~f:(fun r ->
+      begin match result with
+      | Error _ -> ()
+      | Ok freshly_installed_packages ->
+        Set.iter freshly_installed_packages ~f:(Hash_set.add installed)
+      end;
+      Ivar.fill r.finished (Result.ignore result)
+    )
 
-  let rec install_loop ~run package_stream =
+  let rec install_loop ~is_32bit ~run package_stream =
     match%bind Stream.next package_stream with
     | Nil -> assert false
     | Cons (request, rest) ->
-      let%bind () = after (sec 1.) in
-      (* Merging requests doesn't work well when some packages are not installable:
-         {[
-           let requests, rest = Stream.available_now rest in
-           let%bind () = do_install_now ~run (request :: requests) in
-         ]}
-      *)
-      let%bind () = do_install_now ~run [request] in
-      install_loop ~run rest
+(*       let%bind () = do_install_now ~is_32bit ~run [request] in *)
+      let requests, rest = Stream.available_now rest in
+      let%bind () = do_install_now ~is_32bit ~run (request :: requests) in
+      let%bind () = after (sec 1.0) in
+      install_loop ~is_32bit ~run rest
 
   (* Stream of requests *)
   let tail = Tail.create ()
@@ -214,8 +193,15 @@ module External_packages = struct
 
   let start_install_loop ~run =
     match Set_once.get install_loop_guard with
-    | None -> Set_once.set_exn install_loop_guard [%here]
-                (install_loop ~run (Tail.collect tail))
+    | None ->
+      let is_32bit =
+        String.is_suffix ~suffix:"32bit"
+          (Set_once.get_exn config [%here]
+           |> Config.opam_switch
+           |> Opam_switch.to_string)
+      in
+      Set_once.set_exn install_loop_guard [%here]
+        (install_loop ~is_32bit ~run (Tail.collect tail))
     | Some _ -> Log.Global.info "install loop already running"
 
   let install package =
@@ -275,10 +261,6 @@ let setup ~base_dir ~opam_switch ~use_irill_solver =
             failwithf !"server already configured with opam switch %{Opam_switch}"
               current_switch ()
           else begin
-            printf "opam install -y jbuilder ocaml-migrate-parsetree\n%!";
-            let%bind () =
-              S.run_ignore "opam" ["install"; "-y"; "jbuilder";"ocaml-migrate-parsetree"]
-            in
             set_terminal_window_name ();
             Deferred.unit
           end
@@ -303,9 +285,13 @@ let setup ~base_dir ~opam_switch ~use_irill_solver =
       in
 
       let%bind () = setup_environmental_variables ~opam_root ~opam_switch in
-      let%map () = run "opam" ["install"; "-y"; "ocamlfind"; "oasis"] in
       Set_once.set_exn config [%here] (Config.create ~base_dir ~opam_switch);
-      External_packages.start_install_loop ~run)
+      External_packages.start_install_loop ~run;
+      Deferred.List.iter ~how:`Sequential
+        [ "ocamlfind"; "jbuilder"; "ocaml-migrate-parsetree"
+        ; "ppx_derivers"; "ocaml-compiler-libs"; "octavius"; "re" ]
+        ~f:(fun pkg -> External_packages.install (Package_name.of_string pkg))
+    )
   in
   match%map setup_status with
   | Ok () as ok ->
