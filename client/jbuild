@@ -1,11 +1,11 @@
 (executables
  ((names (build_pkg))
   (libraries (
-    core_extended
-    public_release_lib
+    async
     build_pkg_common
+    memo_cache
     ocaml_re
-    async))
+    public_release_lib))
   (preprocess (pps (ppx_jane ppxlib.runner))))
  )
 

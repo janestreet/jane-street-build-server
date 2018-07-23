@@ -42,7 +42,7 @@ let process_log =
           public_file err;
         Int.Map.empty
     in
-    let line_mapping = Core_extended.Cache.memoize line_mapping in
+    let line_mapping = Memo_cache.memoize line_mapping in
 
     (* Map file names and line_numbers in 'File "<filename>", line <line_no>, (...)'. *)
     let raw_log =
