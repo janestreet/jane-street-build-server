@@ -172,7 +172,7 @@ let command_build =
     (let open Command.Let_syntax in
      let%map_open host, port = host_port_flags ()
      and checksum_file =
-       flag "-checksum-file" (optional file)
+       flag "-checksum-file" (optional Filename.arg_type)
          ~doc:"FILE file to which the checksum of the compiled package is saved to"
      and package_dir = anon ("package_dir" %: string)
      and builder =
