@@ -1,6 +1,5 @@
 open Core
 open Async
-open Ocaml_re
 open Public_release_lib.Package_types
 open Public_release_lib.Import
 open Build_pkg_common.Std
@@ -12,7 +11,7 @@ open Build_pkg_common.Std
    [file_list] is the list of files copied from the repo and [dir_mapping] tells where
    these files go in the public released package. *)
 let process_log =
-  let regexp = Re.compile (Re_posix.re "^File \"(.+)\", line ([0-9]+)(.*)$") in
+  let regexp = Re.compile (Re.Posix.re "^File \"(.+)\", line ([0-9]+)(.*)$") in
   let module Grep = Public_release_lib.Grep_internal_stuff in
   fun ~file_list ~dir_mapping ~tarball_path ~pkg_name raw_log ->
     let file_mapping = Grep.file_mapping ~file_list ~dir_mapping in

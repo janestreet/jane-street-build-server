@@ -4,7 +4,7 @@
     async
     build_pkg_common
     memo_cache
-    ocaml_re
+    re
     public_release_lib))
   (preprocess (pps (ppx_jane ppxlib.runner))))
  )
