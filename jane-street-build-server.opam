@@ -1,27 +1,25 @@
-opam-version: "1.2"
+opam-version: "2.0"
 maintainer: "opensource@janestreet.com"
 authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
 homepage: "https://github.com/janestreet/jane-street-build-server"
 bug-reports: "https://github.com/janestreet/jane-street-build-server/issues"
 dev-repo: "git+https://github.com/janestreet/jane-street-build-server.git"
+doc: "https://ocaml.janestreet.com/ocaml-core/latest/doc/jane-street-build-server/index.html"
 license: "MIT"
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
+  ["dune" "build" "-p" name "-j" jobs]
 ]
 depends: [
+  "ocaml" {>= "4.07.0"}
   "async"
   "async_rpc_kernel"
   "core"
   "core_kernel"
   "ppx_jane"
-  "jbuilder"                {build & >= "1.0+beta18.1"}
-  "ocaml-migrate-parsetree" {>= "1.0"}
-  "ppxlib"                  {>= "0.1.0"}
+  "dune"             {build & >= "1.5.1"}
 ]
-available: [ ocaml-version >= "4.06.1" ]
-descr: "
-Jane Street build server
-
+synopsis: "Jane Street build server"
+description: "
 This package is used internally to get a package that we can build on
 OSX, to bootstrap the system.
 "
