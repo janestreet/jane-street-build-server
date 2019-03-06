@@ -172,7 +172,7 @@ module External_packages = struct
       | Ok freshly_installed_packages ->
         Set.iter freshly_installed_packages ~f:(Hash_set.add installed)
       end;
-      Ivar.fill r.finished (Result.ignore result)
+      Ivar.fill r.finished (Result.ignore_m result)
     )
 
   let rec install_loop ~is_32bit ~run package_stream =
