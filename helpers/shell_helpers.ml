@@ -53,7 +53,7 @@ let run_one ?accept_nonzero_exit ?working_dir prog args =
   | lines ->
     raise_s
       [%sexp "command didn't output exactly one line on stdout",
-             { working_dir = (working_dir : string sexp_option)
+             { working_dir = (working_dir : string option [@sexp.option])
              ; prog        = (prog        : string)
              ; args        = (args        : string list)
              ; stdout      = (lines       : string list)
@@ -85,7 +85,7 @@ let run_iter_stdout_and_stderr ?working_dir ~f prog args =
       [%sexp "process failed",
              { prog        = (prog        : string)
              ; args        = (args        : string list)
-             ; working_dir = (working_dir : string sexp_option)
+             ; working_dir = (working_dir : string option [@sexp.option])
              ; exit_status = (exit_status : Unix.Exit_or_signal.error)
              }]
 ;;
@@ -133,7 +133,7 @@ let test ~true_v ~false_v ?working_dir prog args =
       [%sexp "process didn't finish as expected",
              { prog                = (prog : string)
              ; args                = (args : string list)
-             ; working_dir         = (working_dir : string sexp_option)
+             ; working_dir         = (working_dir : string option [@sexp.option])
              ; output              = (output : Process.Output.t)
              ; expected_exit_codes = ([true_v; false_v] : int list)
              }]
