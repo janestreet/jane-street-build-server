@@ -48,7 +48,7 @@ let process_log =
       List.map raw_log ~f:(fun line ->
         Option.try_with (fun () -> Re.exec regexp line)
         |> Option.value_map ~default:(return line) ~f:(fun execd ->
-          let matches = Re.get_all execd in
+          let matches = Re.Group.all execd in
           let filename = matches.(1) in
           let line_no = matches.(2) |> Int.of_string in
           let line_tail = matches.(3) in
