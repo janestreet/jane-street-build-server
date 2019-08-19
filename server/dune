@@ -1,6 +1,6 @@
 (executables (names build_pkg_server)
  (libraries core async build_pkg_common public_release_helpers)
- (preprocess (pps ppx_jane)))
+ (preprocess (pps ppx_jane -allow-unannotated-ignores)))
 
 (install (section bin)
  (files (build_pkg_server.exe as jane-street-build-server)))
